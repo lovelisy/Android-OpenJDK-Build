@@ -17,10 +17,23 @@ if [[ "$TARGET_JDK" == "x86" ]]; then
   export TARGET_JDK=i386
 fi
 
-mv jdkout/jre/lib/${TARGET_JDK}/libfreetype.so.6 jdkout/lib/${TARGET_JDK}/libfreetype.so || echo "Move exit $?"
-mv jdkout/jre/lib/libfreetype.dylib.6 jdkout/jre/lib/libfreetype.dylib || echo "Move exit $?"
-mv jreout/lib/${TARGET_JDK}/libfreetype.so.6 jreout/lib/${TARGET_JDK}/libfreetype.so || echo "Move exit $?"
-mv jreout/lib/libfreetype.dylib.6 jreout/lib/libfreetype.dylib || echo "Move exit $?"
+freetype_src="$PWD/freetype-$BUILD_FREETYPE_VERSION/build_android-$TARGET_SHORT/lib/libfreetype.so"
+if [[ ! -f "$freetype_src" ]]; then
+  echo "Missing $freetype_src"
+  exit 1
+fi
+
+for img in jreout jdkout; do
+  libjava=$(find "$img" -name libjava.so | head -n 1)
+  if [[ -z "$libjava" ]]; then
+    echo "Cannot locate the native library directory in $img"
+    exit 1
+  fi
+  libdir=$(dirname "$libjava")
+  cp -L "$freetype_src" "$libdir/libfreetype.so"
+  cp -L "$freetype_src" "$libdir/libfreetype.so.6"
+  echo "Installed libfreetype.so into $libdir"
+done
 
 find jreout -name "*.diz" -delete
 find jdkout -name "*.diz" -exec mv {} dizout/ \;
