@@ -51,6 +51,19 @@ fi
 sed -i 's/COMPILER_VERSION_NUMBER_MAJOR -lt 5/COMPILER_VERSION_NUMBER_MAJOR -lt 0/' \
   common/autoconf/generated-configure.sh
 
+# The Android port builds libawt_xawt.so as an empty stub (LIBAWT_XAWT_FILES is
+# just list.c) because there is no X11. AWT_OnLoad follows
+# GraphicsEnvironment.isHeadless() and loads that stub whenever DISPLAY is set,
+# which leaves java.awt.Font.initIDs() unresolvable and crashes any mod that
+# touches java.awt.Font. Android is always headless, so load the headless
+# implementation unconditionally.
+perl -0777 -pi -e 's/if\s*\(\s*AWTIsHeadless\s*\(\s*\)\s*\)\s*\{\s*tk\s*=\s*HEADLESS_PATH\s*;\s*\}/tk = HEADLESS_PATH;/s' \
+  jdk/src/solaris/native/sun/awt/awt_LoadLibrary.c
+if grep -Eq 'if[[:space:]]*\([[:space:]]*AWTIsHeadless' jdk/src/solaris/native/sun/awt/awt_LoadLibrary.c; then
+  echo "Failed to force the headless AWT on Android"
+  exit 1
+fi
+
 bash ./configure \
     --openjdk-target=$TARGET_PHYS \
     --with-extra-cflags="$CFLAGS" \
