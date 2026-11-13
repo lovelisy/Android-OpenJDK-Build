@@ -436,7 +436,7 @@ diff --git a/src/hotspot/os/linux/os_perf_linux.cpp b/src/hotspot/os/linux/os_pe
 index ff416d47e..fca2f6aa4 100644
 --- a/src/hotspot/os/linux/os_perf_linux.cpp
 +++ b/src/hotspot/os/linux/os_perf_linux.cpp
-@@ -45,9 +45,312 @@
+@@ -45,9 +45,314 @@
  #include <dlfcn.h>
  #include <pthread.h>
  #include <limits.h>
@@ -608,9 +608,9 @@ index ff416d47e..fca2f6aa4 100644
 +    return nullptr;
 +  }
 +};
-+ifaddrs_storage* new_ifaddrs_storage(ifaddrs** list) {
-+  ifaddrs_storage *storage = nullptr;
-+  memset(storage, 0, sizeof(*storage));
++static ifaddrs_storage* new_ifaddrs_storage(ifaddrs** list) {
++  ifaddrs_storage* storage = static_cast<ifaddrs_storage*>(calloc(1, sizeof(ifaddrs_storage)));
++  if (storage == nullptr) return nullptr;
 +  // push_front onto `list`.
 +  storage->ifa.ifa_next = *list;
 +  *list = reinterpret_cast<ifaddrs*>(storage);
@@ -626,6 +626,7 @@ index ff416d47e..fca2f6aa4 100644
 +    ifinfomsg* ifi = reinterpret_cast<ifinfomsg*>(NLMSG_DATA(hdr));
 +    // Create a new ifaddr entry, and set the interface index and flags.
 +    ifaddrs_storage* new_addr = new_ifaddrs_storage(out);
++    if (new_addr == nullptr) return;
 +    new_addr->interface_index = ifi->ifi_index;
 +    new_addr->ifa.ifa_flags = ifi->ifi_flags;
 +    // Go through the various bits of information and find the name.
@@ -661,6 +662,7 @@ index ff416d47e..fca2f6aa4 100644
 +    if (addr == nullptr) return;
 +    // Create a new ifaddr entry and copy what we already know.
 +    ifaddrs_storage* new_addr = new_ifaddrs_storage(out);
++    if (new_addr == nullptr) return;
 +    // We can just copy the name rather than look for IFA_LABEL.
 +    strcpy(new_addr->name, addr->name);
 +    new_addr->ifa.ifa_name = new_addr->name;
