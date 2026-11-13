@@ -45,6 +45,12 @@ if [[ "$TARGET_JDK" == "x86" ]]; then
   git apply --reject --whitespace=fix ../patches/jdk8u_android_page_trap_fix.diff || echo "git apply failed (x86 page trap fix)"
 fi
 
+# jdk8u master rejects aarch64 builds from compilers it reports as older than
+# GCC 5. android-wrapped-clang reports itself as GCC 4.9 so this check fires,
+# even though the Android NDK clang is far newer.
+sed -i 's/COMPILER_VERSION_NUMBER_MAJOR -lt 5/COMPILER_VERSION_NUMBER_MAJOR -lt 0/' \
+  common/autoconf/generated-configure.sh
+
 bash ./configure \
     --openjdk-target=$TARGET_PHYS \
     --with-extra-cflags="$CFLAGS" \
