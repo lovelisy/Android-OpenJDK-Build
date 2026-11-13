@@ -26,11 +26,11 @@ exit 1
 findexec jreout | xargs ./termux-elf-cleaner/build/termux-elf-cleaner --api-level 24
 findexec jdkout | xargs ./termux-elf-cleaner/build/termux-elf-cleaner --api-level 24
 
-cp -rv jre_override/lib/* jreout/lib/ || true
+cp -rv jre_override/lib/* jdkout/lib/ || true
 
-cd jreout
+cd jdkout
 
 # Strip in place all .so files thanks to the ndk
 find ./ -name '*.so' -execdir $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip {} \;
 
-tar cJf ../jre25-${TARGET_SHORT}-`date +%Y%m%d`-${JDK_DEBUG_LEVEL}.tar.xz .
+tar cJf ../jdk25-${TARGET_SHORT}-`date +%Y%m%d`-${JDK_DEBUG_LEVEL}.tar.xz .
