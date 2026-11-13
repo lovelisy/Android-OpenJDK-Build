@@ -31,7 +31,6 @@ for img in jreout jdkout; do
   fi
   libdir=$(dirname "$libjava")
   cp -L "$freetype_src" "$libdir/libfreetype.so"
-  cp -L "$freetype_src" "$libdir/libfreetype.so.6"
   echo "Installed libfreetype.so into $libdir"
 done
 
