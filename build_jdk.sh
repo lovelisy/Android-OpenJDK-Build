@@ -42,7 +42,9 @@ cd openjdk
 
 # Apply patches
 git reset --hard
-git apply --reject --whitespace=fix ../patches/jdk11u_android.diff || echo "git apply failed (Android patch set)"
+# git apply is too strict for this patch set: the jdk11u sources drift from the
+# revision the diff was authored against and a few hunks only match with fuzz.
+patch -p1 --fuzz=3 --no-backup-if-mismatch < ../patches/jdk11u_android.diff
 
 bash ./configure \
     --with-boot-jdk=$BOOT_JDK \
