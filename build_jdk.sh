@@ -32,6 +32,13 @@ if [[ -z "$BOOT_JDK" ]]; then
     export BOOT_JDK=$PWD/jdk-10.0.2
   fi
 fi
+
+# jdk11u's markOop uses the low bits of an aligned pointer, which is UB and
+# makes clang>=13 miscompile the host buildjdk (SIGSEGV in inflate at startup).
+# Reuse the boot JDK as build JDK instead of compiling a buildjdk for the host.
+if [[ -z "$BUILD_JDK" ]]; then
+  export BUILD_JDK="$BOOT_JDK"
+fi
 export CFLAGS+=" -DANDROID"
 export LDFLAGS+=" -L$PWD/dummy_libs"
 
@@ -52,8 +59,14 @@ git reset --hard
 # revision the diff was authored against and a few hunks only match with fuzz.
 patch -p1 --fuzz=3 --no-backup-if-mismatch < ../patches/jdk11u_android.diff
 
+build_jdk_args=""
+if [[ -n "$BUILD_JDK" ]]; then
+  build_jdk_args="--with-build-jdk=$BUILD_JDK"
+fi
+
 bash ./configure \
     --with-boot-jdk=$BOOT_JDK \
+    $build_jdk_args \
     --openjdk-target=$TARGET \
     --with-extra-cflags="$CFLAGS" \
     --with-extra-cxxflags="$CFLAGS" \
