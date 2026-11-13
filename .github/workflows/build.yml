@@ -29,7 +29,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
-      tag: ${{ steps.matrix.outputs.tag }}
     steps:
     - id: matrix
       env:
@@ -86,7 +85,6 @@ jobs:
 
         with open(os.environ["GITHUB_OUTPUT"], "a") as out:
             out.write("matrix=" + json.dumps({"include": matrix}) + "\n")
-            out.write("tag=jdk-all-" + os.environ["GITHUB_RUN_NUMBER"] + "\n")
         PY
 
   build:
@@ -159,16 +157,22 @@ jobs:
     - name: Publish release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ needs.plan.outputs.tag }}
-        name: "Android JDK builds (run ${{ github.run_number }})"
+        tag_name: android-jdk
+        name: "Android JDK builds"
+        target_commitish: main
+        make_latest: true
+        overwrite_files: true
         body: |
-          Complete Android JDK builds produced by the `main` workflow.
+          Complete Android JDK builds, rebuilt on every run and always kept in
+          this single release.
 
-          Each archive contains a full JDK: `bin/javac`, `jmods`, `include` and the
-          runtime image, cross compiled with the Android NDK.
+          Each archive contains a full JDK: `bin/javac`, `jmods`, `include` and
+          the runtime image, cross compiled with the Android NDK.
 
           Builds are headless. They run console programs and `javac`, but have no
           AWT/Swing or X11 backend.
+
+          Last updated from run ${{ github.run_number }}, commit ${{ github.sha }}.
 
           Verify with `sha256sum -c SHA256SUMS`.
         files: |
