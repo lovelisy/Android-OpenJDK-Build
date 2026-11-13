@@ -23,11 +23,11 @@ exit 1
 findexec jreout | xargs -- ./termux-elf-cleaner/termux-elf-cleaner
 findexec jdkout | xargs -- ./termux-elf-cleaner/termux-elf-cleaner
 
-cp -rv jre_override/lib/* jreout/lib/ || true
+cp -rv jre_override/lib/* jdkout/lib/ || true
 
-cd jreout
+cd jdkout
 
 # Strip in place all .so files thanks to the ndk
 find ./ -name '*.so' -execdir $NDK/toolchains/llvm/prebuilt/linux-x86_64/${NDK_PREBUILT_ARCH}-linux-android/bin/strip {} \;
 
-tar cJf ../jre17-${TARGET_SHORT}-`date +%Y%m%d`-${JDK_DEBUG_LEVEL}.tar.xz .
+tar cJf ../jdk17-${TARGET_SHORT}-`date +%Y%m%d`-${JDK_DEBUG_LEVEL}.tar.xz .
