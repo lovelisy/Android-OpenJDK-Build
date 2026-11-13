@@ -22,12 +22,11 @@ exit 1
 findexec jreout | xargs -- ./termux-elf-cleaner/termux-elf-cleaner
 findexec jdkout | xargs -- ./termux-elf-cleaner/termux-elf-cleaner
 
-sudo cp -R jre_override/lib/* jreout/lib/
 sudo cp -R jre_override/lib/* jdkout/jre/lib
 
-cd jreout
+cd jdkout
 
 # Strip in place all .so files thanks to the ndk
 find ./ -name '*.so' -execdir ${NDK}${NDK_PREBUILT_ARCH} {} \;
 
-tar cJf ../jre8-${TARGET_SHORT}-`date +%Y%m%d`-${JDK_DEBUG_LEVEL}.tar.xz .
+tar cJf ../jdk8-${TARGET_SHORT}-`date +%Y%m%d`-${JDK_DEBUG_LEVEL}.tar.xz .
