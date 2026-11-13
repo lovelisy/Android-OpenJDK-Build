@@ -1,14 +1,190 @@
-name: Build OpenJDK for Android
+name: Build all OpenJDK versions for Android
 
 on:
   workflow_dispatch:
+    inputs:
+      versions:
+        description: 'Versions to build, space separated (8 11 17 21 25)'
+        required: false
+        default: '8 11 17 21 25'
+      archs:
+        description: 'Architectures to build, space separated (aarch64 aarch32 x86_64 x86)'
+        required: false
+        default: 'aarch64 aarch32 x86_64 x86'
+      publish:
+        description: 'Create a GitHub release with the archives'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-all
+  cancel-in-progress: false
 
 jobs:
-  alert:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      tag: ${{ steps.matrix.outputs.tag }}
+    steps:
+    - id: matrix
+      env:
+        VERSIONS: ${{ github.event.inputs.versions || '8 11 17 21 25' }}
+        ARCHS: ${{ github.event.inputs.archs || 'aarch64 aarch32 x86_64 x86' }}
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import json, os
+
+        branches = {
+            "8": "Build_JRE_8",
+            "11": "Build_JRE_11",
+            "17": "Build_JRE_17",
+            "21": "Build_JRE_21.0.12.1",
+            "25": "Build_JRE_25",
+        }
+        # Not every branch has every architecture.
+        available = {
+            "8": ["aarch64", "aarch32", "x86_64", "x86"],
+            "11": ["aarch64", "aarch32", "x86_64", "x86"],
+            "17": ["aarch64", "aarch32", "x86_64", "x86"],
+            "21": ["aarch64", "aarch32", "x86_64", "x86"],
+            "25": ["aarch64", "aarch32", "x86_64"],
+        }
+        # The boot JDK each workflow needs. JDK 8 and 17 download their own
+        # toolchain but still want a host JDK for the configure/build scripts.
+        boot = {
+            "8": "8",
+            "11": "11",
+            "17": "17",
+            "21": "21",
+            "25": "25",
+        }
+
+        wanted_versions = os.environ["VERSIONS"].split()
+        wanted_archs = os.environ["ARCHS"].split()
+
+        matrix = []
+        for version in wanted_versions:
+            if version not in branches:
+                raise SystemExit(f"unknown version: {version}")
+            for arch in wanted_archs:
+                if arch not in available[version]:
+                    continue
+                matrix.append({
+                    "version": version,
+                    "arch": arch,
+                    "branch": branches[version],
+                    "boot": boot[version],
+                })
+        if not matrix:
+            raise SystemExit("no version/arch combinations selected")
+
+        with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+            out.write("matrix=" + json.dumps({"include": matrix}) + "\n")
+            out.write("tag=jdk-all-" + os.environ["GITHUB_RUN_NUMBER"] + "\n")
+        PY
+
+  build:
+    needs: plan
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
     strategy:
       fail-fast: false
-    name: "Alert"
-    runs-on: ubuntu-22.04
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: "JDK ${{ matrix.version }} ${{ matrix.arch }}"
     steps:
-    - name: Please use the workflow of the corresponding branch
+    - name: Checkout the version branch
       uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.branch }}
+
+    - name: Set up boot JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ matrix.boot }}
+        distribution: zulu
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install autoconf python3 python-is-python3 unzip zip \
+          systemtap-sdt-dev libxtst-dev libasound2-dev libelf-dev \
+          libfontconfig1-dev libx11-dev libxext-dev libxrandr-dev libxrender-dev \
+          libxt-dev g++ pkg-config
+
+    - name: Build
+      run: bash "ci_build_arch_${{ matrix.arch }}.sh"
+
+    - name: Collect archives
+      run: |
+        mkdir -p out
+        find . -maxdepth 1 -name 'jdk*.tar.xz' -exec mv {} out/ \;
+        ls -la out
+
+    - name: Upload archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: jdk-${{ matrix.version }}-${{ matrix.arch }}
+        path: out/*
+        if-no-files-found: error
+        retention-days: 7
+
+  release:
+    needs: [plan, build]
+    if: ${{ github.event.inputs.publish != 'false' }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all archives
+      uses: actions/download-artifact@v4
+      with:
+        path: dist
+        pattern: jdk-*
+        merge-multiple: true
+
+    - name: List archives
+      run: ls -la dist
+
+    - name: Collect checksums
+      run: |
+        cd dist
+        for f in *.tar.xz; do sha256sum "$f"; done > SHA256SUMS
+        cat SHA256SUMS
+
+    - name: Publish release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ needs.plan.outputs.tag }}
+        name: "Android JDK builds (run ${{ github.run_number }})"
+        body: |
+          Complete Android JDK builds produced by the `main` workflow.
+
+          Each archive contains a full JDK: `bin/javac`, `jmods`, `include` and the
+          runtime image, cross compiled with the Android NDK.
+
+          Builds are headless. They run console programs and `javac`, but have no
+          AWT/Swing or X11 backend.
+
+          Verify with `sha256sum -c SHA256SUMS`.
+        files: |
+          dist/*.tar.xz
+          dist/SHA256SUMS
+        fail_on_unmatched_files: true
+
+  summary:
+    needs: [plan, build]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Report
+      run: |
+        echo "### Build results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| result |" >> $GITHUB_STEP_SUMMARY
+        echo "| --- |" >> $GITHUB_STEP_SUMMARY
+        echo "| build: ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
