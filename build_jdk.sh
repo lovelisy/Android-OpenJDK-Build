@@ -25,7 +25,13 @@ platform_args="--with-toolchain-type=gcc \
   "
 AUTOCONF_x11arg="--x-includes=$ANDROID_INCLUDE/X11"
 
-export BOOT_JDK=$PWD/jdk-10.0.2
+if [[ -z "$BOOT_JDK" ]]; then
+  if [[ -n "$JAVA_HOME" && -x "$JAVA_HOME/bin/javac" ]]; then
+    export BOOT_JDK="$JAVA_HOME"
+  else
+    export BOOT_JDK=$PWD/jdk-10.0.2
+  fi
+fi
 export CFLAGS+=" -DANDROID"
 export LDFLAGS+=" -L$PWD/dummy_libs"
 
